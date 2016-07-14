@@ -1,0 +1,1 @@
+https://gateway-a.watsonplatform.net/calls/data/GetNews?apikey=29d81ed4d30ec0ae3f439ff00c40529c0750c31a&outputMode=json&start=now-7d&end=now&maxResults=100&q.enriched.url.enrichedTitle.entities.entity=|text=trump,type=person|&return=enriched.url.title,enriched.url.url,enriched.url.docSentiment
