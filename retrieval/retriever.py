@@ -22,7 +22,7 @@ import urllib
 import json
 import csv
 
-apiKey = "29d81ed4d30ec0ae3f439ff00c40529c0750c31a"
+apiKey = ""
 url = "https://gateway-a.watsonplatform.net/calls/data/GetNews?apikey=" + apiKey
 
 #candidates captured by the data - can be narrowed down to "relevant candidates" in the future
