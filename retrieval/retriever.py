@@ -59,7 +59,7 @@ file = open("sentiment_data.csv", "w")
 writer = csv.writer(file)
 writer.writerow(('candidate', 'ID', 'title', 'url', 'date', 'sentiment_score', 'sentiment_type'))
 
-start = "now-60d"
+start = "now-6d"
 end = "now"
 rank = "high"
 count = "1000"
