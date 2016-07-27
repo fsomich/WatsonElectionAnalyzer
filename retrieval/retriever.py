@@ -1,4 +1,34 @@
 from datetime import datetime
+import urllib
+import json
+import csv
+import time
+
+def dataNewsRequest(url):
+	print "url called: \n" + url
+
+	request = urllib.urlopen(url)
+	response = request.read()
+
+	try: responseJson = json.loads(str(response))
+	except: 
+		responseJson = None
+		print "----- PARSE FAILED -----"
+		return
+
+	#Uncomment when there are issues in 
+	print json.dumps(responseJson, indent=4)
+
+	return responseJson
+
+def fillCsv(articles):
+	for item in articles:
+		itemUrl = item["source"]["enriched"]["url"]
+		itemDate = datetime.fromtimestamp(item["timestamp"]).strftime('%Y-%m-%d')
+		articleInfo = ArticleInfo(item["id"], itemUrl["title"].encode('utf-8'), itemUrl["url"].encode('utf-8'), itemDate, itemUrl["docSentiment"]["score"], itemUrl["docSentiment"]["type"])
+		#print articleInfo.printInfo(articleInfo)
+		articleCandidate = candidate.replace("+", " ")
+		writer.writerow((candidate, articleInfo.id, articleInfo.title, articleInfo.url, articleInfo.date, articleInfo.sentimentScore, articleInfo.sentimentType))
 
 class ArticleInfo:
    	def __init__(self, id, title, url, date, sentimentScore, sentimentType):
@@ -17,56 +47,60 @@ class ArticleInfo:
 		print "\n ---- " + article.sentimentType + ": " + str(article.sentimentScore)
 		print "\n ========================"
 
-
-import urllib
-import json
-import csv
-
-apiKey = ""
-url = "https://gateway-a.watsonplatform.net/calls/data/GetNews?apikey=" + apiKey
+API_KEY = ""
 
 #candidates captured by the data - can be narrowed down to "relevant candidates" in the future
 repCandidates = ["Ben+Carson", "Carly+Fiorina", "Chris+Christie", "Donald+Trump", "Jeb+Bush", "John+Kasich", "Marco+Rubio", "Mike+Huckabee", "Rand+Paul", "Rick+Santorum", "Ted+Cruz"]
 demCandidates = ["Bernie+Sanders", "Hillary+Clinton", "Martin+O\'Mally"]
+genCandidates = ["Donald+Trump", "Hillary+Clinton"]
 
 #open 
 file = open("sentiment_data.csv", "w")
 writer = csv.writer(file)
-writer.writerow(('ID', 'title', 'url', 'date', 'sentiment_score', 'sentiment_type'))
+writer.writerow(('candidate', 'ID', 'title', 'url', 'date', 'sentiment_score', 'sentiment_type'))
 
-start = "now-3d"
+start = "now-60d"
+end = "now"
 rank = "high"
-maxResults = "5"
+count = "1000"
 
 #collect the sentiment data for each candidate and write to sentiment_data.csv
-#for candidate in repCandidates:
-candidate = "Donald+Trump"
+for candidate in genCandidates:
 
-url = url + "&outputMode=json&rank=" + rank + "&start=" + start + "&end=now&maxResults=" + maxResults + "&q.enriched.url.enrichedTitle.entities.entity=|text=" + candidate + ",type=person|&return=enriched.url.title,enriched.url.url,enriched.url.docSentiment"
+	url = "https://gateway-a.watsonplatform.net/calls/data/GetNews?apikey=" + API_KEY
 
-print "url called: \n" + url
+	url = url + "&outputMode=json&count=" + count + "&rank=" + rank + "&start=" + start + "&end=" + end + "&q.enriched.url.enrichedTitle.entities.entity=|text=" + candidate + ",type=person|&q.enriched.url.title=-[poll]&q.enriched.url.url=-[reddit]&return=enriched.url.title,enriched.url.url,enriched.url.docSentiment"
 
-request = urllib.urlopen(url)
-response = request.read()
+	jsonData = dataNewsRequest(url)
 
-try: responseJson = json.loads(str(response))
-except: responseJson = None
+	while  'result' not in jsonData:
+		print "----- TIMEOUT ERROR. RETRYING. -----"
+		time.sleep(10)
+		jsonData = dataNewsRequest(url)
 
-print json.dumps(responseJson, indent=4)
+	if 'docs' not in jsonData["result"]:
+		print "----- ERROR RETRIEVING DOCS -----"	
+	else:
+		articles = jsonData["result"]["docs"]
+		fillCsv(articles)
 
-if responseJson == None :
-	print "----- PARSE FAILED -----"
+	while True:
 
-articles = responseJson["result"]["docs"]
+		if 'next' not in jsonData ['result']:
+			print "----- No more results -----"
+			break
 
-for item in articles:
-	itemUrl = item["source"]["enriched"]["url"]
-	itemDate = datetime.fromtimestamp(item["timestamp"]).strftime('%Y-%m-%d')
-	articleInfo = ArticleInfo(item["id"], itemUrl["title"].encode('utf-8'), itemUrl["url"].encode('utf-8'), itemDate, itemUrl["docSentiment"]["score"], itemUrl["docSentiment"]["type"])
-	print articleInfo.printInfo(articleInfo)
-	writer.writerow((articleInfo.id, articleInfo.title, articleInfo.url, articleInfo.date, articleInfo.sentimentScore, articleInfo.sentimentType))
+		nextUrl = url + "&next=" + jsonData['result']['next'].encode('utf-8')
 
-	
+		jsonData = dataNewsRequest(nextUrl)
 
+		while  'result' not in jsonData:
+			print "----- TIMEOUT ERROR. RETRYING. -----"
+			time.sleep(10)
+			jsonData = dataNewsRequest(nextUrl)
 
-
+		if 'docs' not in jsonData["result"]:
+			print "----- ERROR RETRIEVING DOCS -----"	
+		else:
+			articles = jsonData["result"]["docs"]
+			fillCsv(articles)
